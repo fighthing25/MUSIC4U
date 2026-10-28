@@ -39,7 +39,7 @@ jobs:
           choco install wixtoolset -y
           echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install MSYS2 with full build deps
+          - name: Install MSYS2 with full build deps
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -83,12 +83,15 @@ jobs:
           echo "which python  -> $(which python)"
           python3 --version
           python --version
-          python3 -c "import sys; print(sys.executable); print(sys.version)"
 
-          test "$(readlink -f "$(which python3)")" = "/mingw64/bin/python3.exe" || {
-            echo "::error::python3 is not the MinGW Python. PATH=$PATH"
-            exit 1
-          }
+          python3 - <<'PY'
+          import os, sys
+          p = os.path.normcase(os.path.normpath(sys.executable))
+          print("sys.executable =", p)
+          assert "mingw64" in p.lower(), f"Wrong Python environment: {p}"
+          assert p.lower().endswith("python3.exe"), f"Not the MinGW python3: {p}"
+          print("Python verified as MinGW build.")
+          PY
 
           ls -l /mingw64/bin/python* || true
 
@@ -116,15 +119,13 @@ jobs:
           hash -r
 
           echo "PATH=$PATH"
-          echo "python3 resolve:"
-          which python3
-          python3 --version
-          python3 -c "import sys; print(sys.executable)"
-
-          test "$(readlink -f "$(which python3)")" = "/mingw64/bin/python3.exe" || {
-            echo "::error::The FFmpeg build is not using MinGW Python: $(which python3)"
-            exit 1
-          }
+          python3 - <<'PY'
+          import os, sys
+          p = os.path.normcase(os.path.normpath(sys.executable))
+          print("FFmpeg build Python =", p)
+          assert "mingw64" in p.lower(), f"Wrong Python env for FFmpeg build: {p}"
+          assert p.lower().endswith("python3.exe"), f"Not python3: {p}"
+          PY
 
           cd ../ffmpeg-build
           echo "autoreconf version:"
