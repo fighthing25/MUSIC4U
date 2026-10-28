@@ -12,6 +12,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout YMusic
         uses: actions/checkout@v4
@@ -33,6 +34,7 @@ jobs:
         uses: jwlawson/actions-setup-cmake@v2
 
       - name: Install WiX Toolset
+        shell: pwsh
         run: |
           choco install wixtoolset -y
           echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
@@ -60,6 +62,24 @@ jobs:
             meson
             ninja
 
+      - name: Force MinGW toolchain and verify Python
+        shell: msys2 {0}
+        run: |
+          export MSYSTEM=MINGW64
+          export PATH=/mingw64/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+          export PKG_CONFIG=/mingw64/bin/pkg-config
+          export ACLOCAL_PATH=/mingw64/share/aclocal
+          export CC=gcc
+          export CXX=g++
+          hash -r
+
+          echo "PATH=$PATH"
+          echo "which python3 -> $(which python3)"
+          echo "which python  -> $(which python)"
+          python3 --version
+          python --version
+          ls -l /mingw64/bin/python* || true
+
       - name: Clone ffmpeg-build
         shell: bash
         run: |
@@ -67,33 +87,37 @@ jobs:
           rm -rf ffmpeg-build
           git clone --recursive --shallow-submodules https://github.com/ymusic-io/ffmpeg-build ffmpeg-build
 
-      - name: Verify MinGW Python before FFmpeg build
+      - name: Build FFmpeg desktop with MinGW toolchain
         shell: msys2 {0}
         run: |
-          export PATH=/mingw64/bin:$PATH
-          echo "PATH=$PATH"
-          which python || true
-          which python3 || true
-          python --version || true
-          python3 --version || true
-          ls -l /mingw64/bin/python* || true
+          export MSYSTEM=MINGW64
+          export PATH=/mingw64/bin:/usr/local/bin:/usr/bin:/bin:$PATH
+          export PKG_CONFIG=/mingw64/bin/pkg-config
+          export ACLOCAL_PATH=/mingw64/share/aclocal
+          export CC=gcc
+          export CXX=g++
+          hash -r
 
-      - name: Build FFmpeg desktop
-        shell: msys2 {0}
-        run: |
-          export PATH=/mingw64/bin:$PATH
+          echo "PATH=$PATH"
+          echo "python3 resolve:"
+          which python3
+          python3 --version
+
           cd ../ffmpeg-build
           echo "autoreconf version:"
-          autoreconf --version || echo "autoreconf not in PATH, trying which"
+          autoreconf --version || echo "autoreconf not in PATH"
           which autoreconf
           bash scripts/build-desktop.sh
 
       - name: Build YMusic
+        shell: pwsh
         run: |
           ./gradlew.bat :desktopApp:createDistributable :desktopApp:packageMsi :desktopApp:packageExe --no-daemon --stacktrace
 
       - name: Zip portable
-        run: Compress-Archive -Path desktopApp\build\compose\binaries\main\app\* -DestinationPath YMusic-Portable-Windows.zip -Force
+        shell: pwsh
+        run: |
+          Compress-Archive -Path desktopApp\build\compose\binaries\main\app\* -DestinationPath YMusic-Portable-Windows.zip -Force
 
       - name: Upload Portable
         uses: actions/upload-artifact@v4
