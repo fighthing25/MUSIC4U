@@ -1,8 +1,5 @@
 name: release
 
-# The shipping build, run by pushing a release tag: git tag release-v4.0.0 && git push <remote> release-v4.0.0
-# Any branch: the tag alone picks the commit. The draft release waits for the tests and the bundle
-# compat check as well as the builds.
 on:
   push:
     tags: ['release-*']
@@ -31,12 +28,12 @@ jobs:
           - { slug: android-arm64-v8a, runner: ubuntu-24.04 }
           - { slug: android-x86, runner: ubuntu-24.04 }
           - { slug: android-x86_64, runner: ubuntu-24.04 }
+          - { slug: windows-x86_64, runner: windows-2022 }
           - { slug: macos-arm64, runner: macos-14 }
           - { slug: macos-x86_64, runner: macos-15-intel }
-
     steps:
       - id: cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        uses: actions/cache@v4
         with:
           path: ffmpeg-build/out/${{ matrix.slug }}
           key: ffmpeg-${{ matrix.slug }}-${{ env.FFMPEG_BUILD_REF }}${{ startsWith(matrix.slug, 'android-') && format('-ndk{0}', env.NDK_VERSION) || '' }}
@@ -60,14 +57,16 @@ jobs:
         working-directory: ffmpeg-build
         run: |
           sudo apt-get update && sudo apt-get install -y nasm automake autoconf libtool pkg-config patchelf
-          scripts/build-android.sh "${SLUG#android-}" || {
-            for log in .deps-$SLUG/.build/*/config.log; do
-              [ -f "$log" ] && { echo "::group::$log"; tail -n 80 "$log"; echo "::endgroup::"; }
-            done
-            exit 1
-          }
+          scripts/build-android.sh "${SLUG#android-}"
         env:
           SLUG: ${{ matrix.slug }}
+
+      - if: steps.cache.outputs.cache-hit != 'true' && startsWith(matrix.slug, 'windows-')
+        name: Build Windows ffmpeg
+        working-directory: ffmpeg-build
+        shell: bash
+        run: |
+          bash ./scripts/build-desktop.sh
 
       - if: steps.cache.outputs.cache-hit != 'true' && startsWith(matrix.slug, 'macos-')
         working-directory: ffmpeg-build
@@ -110,9 +109,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Install NDK
@@ -148,25 +149,22 @@ jobs:
         with:
           path: YMusicV4
 
-      - uses: actions/cache/restore@v4
+      - name: Restore ffmpeg windows cache
+        uses: actions/cache/restore@v4
         with:
-          path: ffmpeg-build/out/macos-arm64
-          key: ffmpeg-macos-arm64-${{ env.FFMPEG_BUILD_REF }}
-          fail-on-cache-miss: true
-
-      - uses: actions/cache/restore@v4
-        with:
-          path: ffmpeg-build/out/macos-x86_64
-          key: ffmpeg-macos-x86_64-${{ env.FFMPEG_BUILD_REF }}
+          path: ffmpeg-build/out/windows-x86_64
+          key: ffmpeg-windows-x86_64-${{ env.FFMPEG_BUILD_REF }}
           fail-on-cache-miss: true
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Restore secrets
