@@ -64,6 +64,9 @@ jobs:
 
       - name: Force MinGW toolchain and verify Python
         shell: msys2 {0}
+        env:
+          PYTHONHOME: ""
+          PYTHONPATH: ""
         run: |
           export MSYSTEM=MINGW64
           export PATH=/mingw64/bin:/usr/local/bin:/usr/bin:/bin:$PATH
@@ -71,6 +74,8 @@ jobs:
           export ACLOCAL_PATH=/mingw64/share/aclocal
           export CC=gcc
           export CXX=g++
+          export PYTHON=/mingw64/bin/python3
+          export PYTHON3=/mingw64/bin/python3
           hash -r
 
           echo "PATH=$PATH"
@@ -78,6 +83,13 @@ jobs:
           echo "which python  -> $(which python)"
           python3 --version
           python --version
+          python3 -c "import sys; print(sys.executable); print(sys.version)"
+
+          test "$(readlink -f "$(which python3)")" = "/mingw64/bin/python3.exe" || {
+            echo "::error::python3 is not the MinGW Python. PATH=$PATH"
+            exit 1
+          }
+
           ls -l /mingw64/bin/python* || true
 
       - name: Clone ffmpeg-build
@@ -89,6 +101,9 @@ jobs:
 
       - name: Build FFmpeg desktop with MinGW toolchain
         shell: msys2 {0}
+        env:
+          PYTHONHOME: ""
+          PYTHONPATH: ""
         run: |
           export MSYSTEM=MINGW64
           export PATH=/mingw64/bin:/usr/local/bin:/usr/bin:/bin:$PATH
@@ -96,12 +111,20 @@ jobs:
           export ACLOCAL_PATH=/mingw64/share/aclocal
           export CC=gcc
           export CXX=g++
+          export PYTHON=/mingw64/bin/python3
+          export PYTHON3=/mingw64/bin/python3
           hash -r
 
           echo "PATH=$PATH"
           echo "python3 resolve:"
           which python3
           python3 --version
+          python3 -c "import sys; print(sys.executable)"
+
+          test "$(readlink -f "$(which python3)")" = "/mingw64/bin/python3.exe" || {
+            echo "::error::The FFmpeg build is not using MinGW Python: $(which python3)"
+            exit 1
+          }
 
           cd ../ffmpeg-build
           echo "autoreconf version:"
