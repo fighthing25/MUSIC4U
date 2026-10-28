@@ -52,6 +52,8 @@ jobs:
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-setuptools
             yasm
             nasm
             mingw-w64-x86_64-autotools
@@ -65,9 +67,21 @@ jobs:
           rm -rf ffmpeg-build
           git clone --recursive --shallow-submodules https://github.com/ymusic-io/ffmpeg-build ffmpeg-build
 
+      - name: Verify MinGW Python before FFmpeg build
+        shell: msys2 {0}
+        run: |
+          export PATH=/mingw64/bin:$PATH
+          echo "PATH=$PATH"
+          which python || true
+          which python3 || true
+          python --version || true
+          python3 --version || true
+          ls -l /mingw64/bin/python* || true
+
       - name: Build FFmpeg desktop
         shell: msys2 {0}
         run: |
+          export PATH=/mingw64/bin:$PATH
           cd ../ffmpeg-build
           echo "autoreconf version:"
           autoreconf --version || echo "autoreconf not in PATH, trying which"
