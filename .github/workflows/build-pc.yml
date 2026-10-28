@@ -55,6 +55,8 @@ jobs:
             yasm
             nasm
             mingw-w64-x86_64-autotools
+            meson
+            ninja
 
       - name: Clone ffmpeg-build
         shell: bash
