@@ -1,5 +1,5 @@
 
-name: Build YMusic PC (MSI + EXE + Portable) - FIXED V3
+name: Build YMusic PC (MSI + EXE + Portable) - FIXED V4
 
 on:
   push:
@@ -38,7 +38,8 @@ jobs:
           choco install wixtoolset -y
           echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install MSYS2 with git
+      # FIX V4: Tambah autoconf/automake/libtool untuk shine + pkg-config + yasm/nasm
+      - name: Install MSYS2 with full build deps
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -46,21 +47,31 @@ jobs:
           install: >-
             base-devel
             git
+            autoconf
+            automake
+            libtool
+            pkgconf
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-pkg-config
+            mingw-w64-x86_64-yasm
+            mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-autotools
 
       - name: Clone ffmpeg-build
         shell: bash
         run: |
           cd ..
+          rm -rf ffmpeg-build
           git clone --recursive --shallow-submodules https://github.com/ymusic-io/ffmpeg-build ffmpeg-build
-          ls -la ffmpeg-build
 
       - name: Build FFmpeg desktop
         shell: msys2 {0}
         run: |
           cd ../ffmpeg-build
-          git --version
+          echo "autoreconf version:"
+          autoreconf --version || echo "autoreconf not in PATH, trying which"
+          which autoreconf
           bash scripts/build-desktop.sh
 
       - name: Build YMusic
@@ -87,4 +98,3 @@ jobs:
         with:
           name: YMusic-EXE-Installer
           path: desktopApp\build\compose\binaries\main\exe\*.exe
-
