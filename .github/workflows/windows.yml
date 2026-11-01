@@ -65,6 +65,17 @@ jobs:
             mingw-w64-x86_64-nasm
             mingw-w64-x86_64-pkgconf
 
+      # Perbaikan kecil untuk skrip ffmpeg-build: di Windows, alat "readelf" gagal membaca ffmpeg.exe
+      # dan, karena skrip memakai "set -o pipefail", seluruh build berhenti diam-diam. Dengan
+      # menambahkan "|| true" skrip lanjut ke pemeriksaan khusus Windows (objdump).
+      - name: Patch ffmpeg-build for Windows
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: ffmpeg-build
+        run: |
+          sed -i '/listing="\$("\$od" -d "\$binary"/ s/$/ || true/' scripts/common.sh
+          grep -n -F 'listing="$("$od" -d' scripts/common.sh
+
       - name: Build ffmpeg for Windows
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
