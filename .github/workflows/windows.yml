@@ -69,7 +69,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         working-directory: ffmpeg-build
-        run: scripts/build-desktop.sh
+        run: bash -x scripts/build-desktop.sh
 
       - name: Save ffmpeg build
         if: steps.cache.outputs.cache-hit != 'true'
