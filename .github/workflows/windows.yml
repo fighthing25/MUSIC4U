@@ -76,6 +76,16 @@ jobs:
           sed -i '/listing="\$("\$od" -d "\$binary"/ s/$/ || true/' scripts/common.sh
           grep -n -F 'listing="$("$od" -d' scripts/common.sh
 
+      # ffmpeg-build hanya mengizinkan DLL milik Windows dan DLL libav sendiri. Secara bawaan MSYS2
+      # menautkan zlib sebagai zlib1.dll (ditolak pemeriksa). Dengan menghapus "jembatan" DLL-nya,
+      # linker memakai zlib statis (libz.a) sehingga zlib tertanam di dalam DLL libav.
+      - name: Use static zlib
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: |
+          ls -l /mingw64/lib/libz.a
+          rm -fv /mingw64/lib/libz.dll.a
+
       - name: Build ffmpeg for Windows
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
