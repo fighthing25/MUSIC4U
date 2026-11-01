@@ -77,14 +77,20 @@ jobs:
           grep -n -F 'listing="$("$od" -d' scripts/common.sh
 
       # ffmpeg-build hanya mengizinkan DLL milik Windows dan DLL libav sendiri. Secara bawaan MSYS2
-      # menautkan zlib sebagai zlib1.dll (ditolak pemeriksa). Dengan menghapus "jembatan" DLL-nya,
-      # linker memakai zlib statis (libz.a) sehingga zlib tertanam di dalam DLL libav.
-      - name: Use static zlib
+      # menautkan zlib dan winpthread sebagai DLL terpisah (zlib1.dll, libwinpthread-1.dll) yang
+      # ditolak pemeriksa. Dengan menghapus "jembatan" DLL-nya, linker memakai versi statis (.a)
+      # sehingga keduanya tertanam di dalam DLL libav.
+      - name: Use static zlib and winpthread
         if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
-          ls -l /mingw64/lib/libz.a
-          rm -fv /mingw64/lib/libz.dll.a
+          for n in z winpthread pthread; do
+            if [ -f "/mingw64/lib/lib$n.a" ]; then
+              rm -fv "/mingw64/lib/lib$n.dll.a"
+            else
+              echo "tidak ada lib$n.a, dilewati"
+            fi
+          done
 
       - name: Build ffmpeg for Windows
         if: steps.cache.outputs.cache-hit != 'true'
@@ -101,9 +107,15 @@ jobs:
 
       # Tanpa SECRETS_PASSPHRASE (kunci milik pemilik repo asli) build berjalan dengan
       # pengaturan bawaan: tanpa tanda tangan, tanpa layanan jarak jauh.
+      # Modul quickjs dan mse membangun pustaka C lewat CMake. Generator dan compiler dipaksa ke
+      # versi MSYS2 (Ninja + gcc) supaya CMake tidak memilih Visual Studio atau clang bawaan Windows.
       - name: Package MSI
         shell: msys2 {0}
         working-directory: YMusicV4
+        env:
+          CMAKE_GENERATOR: Ninja
+          CC: gcc
+          CXX: g++
         run: ./gradlew -Pproduction=true :desktopApp:packageReleaseMsi --stacktrace
 
       - name: Upload logs if failed
