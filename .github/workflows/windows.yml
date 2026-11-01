@@ -79,9 +79,9 @@ jobs:
       # ffmpeg-build hanya mengizinkan DLL milik Windows dan DLL libav sendiri. Secara bawaan MSYS2
       # menautkan zlib dan winpthread sebagai DLL terpisah (zlib1.dll, libwinpthread-1.dll) yang
       # ditolak pemeriksa. Dengan menghapus "jembatan" DLL-nya, linker memakai versi statis (.a)
-      # sehingga keduanya tertanam di dalam DLL libav.
+      # sehingga keduanya tertanam di dalam DLL libav. Selalu dijalankan (tidak dilewati saat cache
+      # dipakai), karena pustaka JNI di tahap Gradle juga harus mengikuti aturan yang sama.
       - name: Use static zlib and winpthread
-        if: steps.cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: |
           for n in z winpthread pthread; do
@@ -107,6 +107,18 @@ jobs:
 
       # Tanpa SECRETS_PASSPHRASE (kunci milik pemilik repo asli) build berjalan dengan
       # pengaturan bawaan: tanpa tanda tangan, tanpa layanan jarak jauh.
+      # CMakeLists milik proyek belum disiapkan untuk MinGW (Windows): (1) mse hanya mengenali
+      # libavformat.dll, padahal ffmpeg MinGW menyediakan libavformat.dll.a; (2) MinGW menamai hasil
+      # "libNAMA.dll", sedangkan Gradle mencari "NAMA.dll", jadi awalan "lib" dihilangkan.
+      - name: Patch CMakeLists for Windows
+        shell: bash
+        working-directory: YMusicV4
+        run: |
+          sed -i 's/ libavformat\.dll)/ libavformat.dll libavformat.dll.a)/' mse/native/CMakeLists.txt
+          sed -i '/^project(mseffmpegjni C)/a set(CMAKE_SHARED_LIBRARY_PREFIX "")' mse/native/CMakeLists.txt
+          sed -i '/^project(quickjsjni C)/a set(CMAKE_SHARED_LIBRARY_PREFIX "")' quickjs/native/CMakeLists.txt
+          grep -n -E 'libavformat.dll.a|CMAKE_SHARED_LIBRARY_PREFIX' mse/native/CMakeLists.txt quickjs/native/CMakeLists.txt
+
       # Modul quickjs dan mse membangun pustaka C lewat CMake. Generator dan compiler dipaksa ke
       # versi MSYS2 (Ninja + gcc) supaya CMake tidak memilih Visual Studio atau clang bawaan Windows.
       - name: Package MSI
@@ -116,6 +128,7 @@ jobs:
           CMAKE_GENERATOR: Ninja
           CC: gcc
           CXX: g++
+          LDFLAGS: -static-libgcc
         run: ./gradlew -Pproduction=true :desktopApp:packageReleaseMsi --stacktrace
 
       - name: Upload logs if failed
